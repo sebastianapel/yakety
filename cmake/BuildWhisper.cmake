@@ -53,6 +53,19 @@ function(build_whisper_cpp)
             list(APPEND WHISPER_CMAKE_ARGS -DGGML_VULKAN=ON)
             message(STATUS "Vulkan SDK found, enabling GPU acceleration for whisper.cpp")
         endif()
+    elseif(UNIX)
+        # Enable native optimizations for better performance
+        list(APPEND WHISPER_CMAKE_ARGS -DGGML_NATIVE=ON)
+        
+        # Check for Vulkan and glslc (shader compiler required for Vulkan backend)
+        find_package(Vulkan QUIET)
+        find_program(GLSLC_EXECUTABLE glslc)
+        if(Vulkan_FOUND AND GLSLC_EXECUTABLE)
+            list(APPEND WHISPER_CMAKE_ARGS -DGGML_VULKAN=ON)
+            message(STATUS "Vulkan found with glslc, enabling GPU acceleration for whisper.cpp")
+        elseif(Vulkan_FOUND)
+            message(STATUS "Vulkan found but glslc missing - install Vulkan SDK for GPU acceleration")
+        endif()
     endif()
     
     # Build whisper.cpp if libraries don't exist

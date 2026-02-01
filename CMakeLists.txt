@@ -91,6 +91,20 @@ elseif(WIN32)
     if(HAS_VULKAN)
         target_link_libraries(platform PUBLIC ${VULKAN_LIB})
     endif()
+elseif(UNIX)
+    target_sources(platform PRIVATE
+        src/linux/logging.c
+        src/linux/clipboard.c
+        src/linux/overlay.c
+        src/linux/dialog.c
+        src/linux/menu.c
+        src/linux/keylogger.c
+        src/linux/app.c
+        src/linux/utils.c
+        src/linux/http.c
+        src/preferences.c
+    )
+    target_link_libraries(platform PUBLIC ${PLATFORM_LIBS})
 endif()
 
 # Include directories for platform library
@@ -110,6 +124,11 @@ if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
         "$<$<CONFIG:Debug>:${CMAKE_BINARY_DIR}/platform.build/Debug/DerivedSources>"
         "$<$<CONFIG:Release>:${CMAKE_BINARY_DIR}/platform.build/Release/DerivedSources>"
     )
+endif()
+
+# Add libevdev include directories for Linux
+if(UNIX AND NOT APPLE AND LIBEVDEV_INCLUDE_DIRS)
+    target_include_directories(platform PRIVATE ${LIBEVDEV_INCLUDE_DIRS})
 endif()
 
 # Business logic sources
@@ -226,6 +245,8 @@ if(APPLE)
     target_link_libraries(recorder platform ${PLATFORM_FRAMEWORKS})
 elseif(WIN32)
     target_link_libraries(recorder platform ${PLATFORM_LIBS})
+elseif(UNIX)
+    target_link_libraries(recorder platform ${PLATFORM_LIBS} m)
 endif()
 
 # Find and link whisper.cpp libraries
@@ -267,6 +288,14 @@ elseif(WIN32 AND HAS_VULKAN)
     if(GGML_VULKAN_LIBRARY)
         list(APPEND WHISPER_LIBS ${GGML_VULKAN_LIBRARY})
     endif()
+elseif(UNIX AND HAS_VULKAN)
+    find_library(GGML_VULKAN_LIBRARY NAMES ggml-vulkan
+        PATHS "${GGML_LIB_DIR}/ggml-vulkan"
+        NO_DEFAULT_PATH)
+    if(GGML_VULKAN_LIBRARY)
+        list(APPEND WHISPER_LIBS ${GGML_VULKAN_LIBRARY})
+        message(STATUS "Vulkan acceleration: ${GGML_VULKAN_LIBRARY}")
+    endif()
 endif()
 
 # Link whisper to all targets that need it
@@ -278,6 +307,9 @@ foreach(target yakety-cli yakety-app transcribe)
         ${WHISPER_DIR}/ggml/include
     )
     target_compile_definitions(${target} PRIVATE WHISPER_AVAILABLE)
+    if(UNIX AND HAS_VULKAN)
+        target_link_libraries(${target} PRIVATE Vulkan::Vulkan)
+    endif()
 endforeach()
 
 # Add miniaudio compile definitions for proper framework linking on macOS

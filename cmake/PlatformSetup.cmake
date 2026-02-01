@@ -63,22 +63,42 @@ function(setup_platform_libs)
     elseif(UNIX)
         # Linux libraries
         find_package(Threads REQUIRED)
-        set(PLATFORM_LIBS ${CMAKE_THREAD_LIBS_INIT} dl m PARENT_SCOPE)
+        set(_PLATFORM_LIBS ${CMAKE_THREAD_LIBS_INIT} dl m)
         
         # Check for ALSA
         find_package(ALSA)
         if(ALSA_FOUND)
-            list(APPEND PLATFORM_LIBS ${ALSA_LIBRARIES})
+            list(APPEND _PLATFORM_LIBS ${ALSA_LIBRARIES})
         endif()
         
-        # Check for PulseAudio
+        # Check for PulseAudio and libevdev
         find_package(PkgConfig)
         if(PKG_CONFIG_FOUND)
             pkg_check_modules(PULSEAUDIO libpulse)
             if(PULSEAUDIO_FOUND)
-                list(APPEND PLATFORM_LIBS ${PULSEAUDIO_LIBRARIES})
+                list(APPEND _PLATFORM_LIBS ${PULSEAUDIO_LIBRARIES})
+            endif()
+            
+            pkg_check_modules(LIBEVDEV libevdev)
+            if(LIBEVDEV_FOUND)
+                list(APPEND _PLATFORM_LIBS ${LIBEVDEV_LIBRARIES})
+                set(LIBEVDEV_INCLUDE_DIRS ${LIBEVDEV_INCLUDE_DIRS} PARENT_SCOPE)
+                message(STATUS "Found libevdev: ${LIBEVDEV_LIBRARIES}")
+            else()
+                message(WARNING "libevdev not found - keylogger will not work")
             endif()
         endif()
+        
+        # Check for Vulkan
+        find_package(Vulkan)
+        if(Vulkan_FOUND)
+            message(STATUS "Found Vulkan: ${Vulkan_LIBRARIES}")
+            set(VULKAN_LIB ${Vulkan_LIBRARIES} PARENT_SCOPE)
+            set(HAS_VULKAN TRUE PARENT_SCOPE)
+        endif()
+        
+        # Export platform libs to parent scope
+        set(PLATFORM_LIBS ${_PLATFORM_LIBS} PARENT_SCOPE)
     endif()
 endfunction()
 
